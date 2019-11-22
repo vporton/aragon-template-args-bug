@@ -1,0 +1,11 @@
+# Aragon bug
+
+npm run start:template
+
+produces
+
+Invalid number of parameters for "newInstance". Got 0 expected 1!
+
+despite I do pass an argument.
+
+Or is it a bug in documentation?
