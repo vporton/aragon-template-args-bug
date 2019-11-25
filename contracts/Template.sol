@@ -8,7 +8,7 @@
  * you are free to choose a different license for the rest of the project.
  */
 
-pragma solidity ^0.4.0;
+pragma solidity 0.4.24;
 
 import "@aragon/os/contracts/factory/DAOFactory.sol";
 import "@aragon/os/contracts/apm/Repo.sol";
@@ -16,11 +16,11 @@ import "@aragon/os/contracts/lib/ens/ENS.sol";
 import "@aragon/os/contracts/lib/ens/PublicResolver.sol";
 import "@aragon/os/contracts/apm/APMNamehash.sol";
 
-//import "@aragon/apps-voting/contracts/Voting.sol";
-//import "@aragon/apps-token-manager/contracts/TokenManager.sol";
-//import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
+import "@aragon/apps-voting/contracts/Voting.sol";
+import "@aragon/apps-token-manager/contracts/TokenManager.sol";
+import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
-import "./App.sol";
+import "./CounterApp.sol";
 
 
 contract TemplateBase is APMNamehash {
@@ -52,13 +52,13 @@ contract TemplateBase is APMNamehash {
 
 
 contract Template is TemplateBase {
-    //MiniMeTokenFactory tokenFactory;
+    MiniMeTokenFactory tokenFactory;
 
     uint64 constant PCT = 10 ** 16;
     address constant ANY_ENTITY = address(-1);
 
     constructor(ENS ens) TemplateBase(DAOFactory(0), ens) public {
-        //tokenFactory = new MiniMeTokenFactory();
+        tokenFactory = new MiniMeTokenFactory();
     }
 
     function newInstance(address ownedContract) public {
@@ -67,29 +67,30 @@ contract Template is TemplateBase {
         acl.createPermission(this, dao, dao.APP_MANAGER_ROLE(), this);
 
         address root = msg.sender;
-        bytes32 appId = keccak256(abi.encodePacked(apmNamehash("open"), keccak256("reward")));
-//         bytes32 votingAppId = apmNamehash("voting");
-        //bytes32 tokenManagerAppId = apmNamehash("token-manager");
+        bytes32 appId = keccak256(abi.encodePacked(apmNamehash("open"), keccak256("placeholder-app-name")));
+        bytes32 votingAppId = apmNamehash("voting");
+        bytes32 tokenManagerAppId = apmNamehash("token-manager");
 
-        App app = App(dao.newAppInstance(appId, latestVersionAppBase(appId)));
-//         Voting voting = Voting(dao.newAppInstance(votingAppId, latestVersionAppBase(votingAppId)));
-        //TokenManager tokenManager = TokenManager(dao.newAppInstance(tokenManagerAppId, latestVersionAppBase(tokenManagerAppId)));
+        CounterApp app = CounterApp(dao.newAppInstance(appId, latestVersionAppBase(appId)));
+        Voting voting = Voting(dao.newAppInstance(votingAppId, latestVersionAppBase(votingAppId)));
+        TokenManager tokenManager = TokenManager(dao.newAppInstance(tokenManagerAppId, latestVersionAppBase(tokenManagerAppId)));
 
-        //MiniMeToken token = tokenFactory.createCloneToken(MiniMeToken(0), 0, "App token", 0, "APP", true);
-        //token.changeController(tokenManager);
+        MiniMeToken token = tokenFactory.createCloneToken(MiniMeToken(0), 0, "App token", 0, "APP", true);
+        token.changeController(tokenManager);
 
         // Initialize apps
         app.initialize();
-        //tokenManager.initialize(token, true, 0);
-        //voting.initialize(token, 50 * PCT, 50 * PCT, 7 days);
+        tokenManager.initialize(token, true, 0);
+        voting.initialize(token, 50 * PCT, 20 * PCT, 1 days);
 
-        //acl.createPermission(this, tokenManager, tokenManager.MINT_ROLE(), this);
-        //tokenManager.mint(root, 1); // Give one token to root
+        acl.createPermission(this, tokenManager, tokenManager.MINT_ROLE(), this);
+        tokenManager.mint(root, 1); // Give one token to root
 
-        //acl.createPermission(ANY_ENTITY, voting, voting.CREATE_VOTES_ROLE(), root);
+        acl.createPermission(ANY_ENTITY, voting, voting.CREATE_VOTES_ROLE(), root);
 
-        //acl.createPermission(voting, app, app.JUDGE_ROLE(), voting);
-        //acl.grantPermission(voting, tokenManager, tokenManager.MINT_ROLE());
+        acl.createPermission(voting, app, app.INCREMENT_ROLE(), voting);
+        acl.createPermission(ANY_ENTITY, app, app.DECREMENT_ROLE(), root);
+        acl.grantPermission(voting, tokenManager, tokenManager.MINT_ROLE());
 
         // Clean up permissions
         acl.grantPermission(root, dao, dao.APP_MANAGER_ROLE());
